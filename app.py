@@ -89,6 +89,8 @@ PROCESSED_DIR = os.path.join("data", "processed")
 
 def hex_to_rgba(hex_color: str, alpha: float) -> str:
     h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = h[0]*2 + h[1]*2 + h[2]*2
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     return f"rgba({r},{g},{b},{alpha})"
 
@@ -425,8 +427,8 @@ def render_trajectory_tab(
     ke_gdp_2033 = None
     ke_fc_gdp = load_kenya_gdp_forecast()
     if ke_fc_gdp is not None:
-        ke_fc_gdp["_year"] = pd.to_datetime(ke_fc_gdp["ds"]).dt.year
-        row_2033 = ke_fc_gdp[(ke_fc_gdp["is_forecast"] == True) & (ke_fc_gdp["_year"] == 2033)]
+        _years = pd.to_datetime(ke_fc_gdp["ds"]).dt.year
+        row_2033 = ke_fc_gdp[ke_fc_gdp["is_forecast"] & (_years == 2033)]
         if not row_2033.empty:
             ke_gdp_2033 = row_2033.iloc[0]["yhat"]
 
@@ -574,8 +576,8 @@ def render_trajectory_tab(
         annotation_position="top right",
     )
 
-    # Milestone markers at 2030 and 2035 (if in range)
-    for milestone_year, milestone_label in [(2030, "2030"), (2035, "2035")]:
+    # Milestone markers at 2030 and 2033 (if in range)
+    for milestone_year, milestone_label in [(2030, "2030"), (2033, "2033")]:
         if milestone_year <= end_year:
             fig.add_vline(
                 x=pd.Timestamp(f"{milestone_year}-01-01"),
@@ -586,16 +588,8 @@ def render_trajectory_tab(
             )
 
     layout = plotly_layout(f"{ind_label} — Historical & {horizon}-Year Forecast", 520)
-    layout.update(
-        xaxis=dict(
-            **layout.get("xaxis", {}),
-            title=dict(text="Year", font=dict(color=MUTED)),
-        ),
-        yaxis=dict(
-            **layout.get("yaxis", {}),
-            title=dict(text=ind_label, font=dict(color=MUTED)),
-        ),
-    )
+    layout["xaxis"]["title"] = dict(text="Year", font=dict(color=MUTED))
+    layout["yaxis"]["title"] = dict(text=ind_label, font=dict(color=MUTED))
     fig.update_layout(**layout)
     st.plotly_chart(fig, use_container_width=True)
 
@@ -617,9 +611,9 @@ def render_trajectory_tab(
 
         fc_2030 = None
         fc_2033 = None
-        ke_fc["year"] = pd.to_datetime(ke_fc["ds"]).dt.year
-        row_2030 = ke_fc[ke_fc["year"] == 2030]
-        row_2033 = ke_fc[ke_fc["year"] == min(2033, end_year)]
+        _ke_years = pd.to_datetime(ke_fc["ds"]).dt.year
+        row_2030 = ke_fc[_ke_years == 2030]
+        row_2033 = ke_fc[_ke_years == min(2033, end_year)]
         if not row_2030.empty:
             fc_2030 = row_2030.iloc[0]["yhat"]
         if not row_2033.empty:
@@ -687,8 +681,8 @@ def render_trajectory_tab(
         for iso2 in eac:
             fc = forecast_cache.get(iso2)
             if fc is not None:
-                fc["year"] = pd.to_datetime(fc["ds"]).dt.year
-                row = fc[fc["year"] == min(2033, end_year)]
+                _fc_years = pd.to_datetime(fc["ds"]).dt.year
+                row = fc[_fc_years == min(2033, end_year)]
                 if not row.empty:
                     eac_vals.append(row.iloc[0]["yhat"])
         eac_avg = sum(eac_vals) / len(eac_vals) if eac_vals else None
@@ -696,8 +690,8 @@ def render_trajectory_tab(
         za_fc = forecast_cache.get("ZA")
         za_val = None
         if za_fc is not None:
-            za_fc["year"] = pd.to_datetime(za_fc["ds"]).dt.year
-            za_row = za_fc[za_fc["year"] == min(2033, end_year)]
+            _za_years = pd.to_datetime(za_fc["ds"]).dt.year
+            za_row = za_fc[_za_years == min(2033, end_year)]
             if not za_row.empty:
                 za_val = za_row.iloc[0]["yhat"]
 
@@ -797,7 +791,7 @@ def render_clusters_tab(dev_df: pd.DataFrame, cluster_df: pd.DataFrame):
                     ),
                     name=cluster,
                     legendgroup=cluster,
-                    showlegend=(row.name == sub.index[0]),
+                    showlegend=bool(row.name == sub.index[0]),
                     hovertemplate=(
                         f"<b>{row['economy']}</b><br>"
                         f"GDP per Capita: ${{x:,.0f}}<br>"
@@ -809,25 +803,16 @@ def render_clusters_tab(dev_df: pd.DataFrame, cluster_df: pd.DataFrame):
             )
 
     layout = plotly_layout("Development Clusters — GDP vs Life Expectancy", 560)
-    layout.update(
-        xaxis=dict(
-            **layout.get("xaxis", {}),
-            title=dict(text="GDP per Capita (const. 2015 USD)", font=dict(color=MUTED)),
-            type="log",
-        ),
-        yaxis=dict(
-            **layout.get("yaxis", {}),
-            title=dict(text="Life Expectancy (years)", font=dict(color=MUTED)),
-        ),
-        hovermode="closest",
-    )
+    layout["xaxis"]["title"] = dict(text="GDP per Capita (const. 2015 USD)", font=dict(color=MUTED))
+    layout["xaxis"]["type"] = "log"
+    layout["yaxis"]["title"] = dict(text="Life Expectancy (years)", font=dict(color=MUTED))
+    layout["hovermode"] = "closest"
     fig.update_layout(**layout)
     st.plotly_chart(fig, use_container_width=True)
 
     st.caption("Bubble size = Internet Users (%). X-axis is log scale. ★ = Kenya.")
 
     # ── Cluster summary metrics ────────────────────────────────────────────
-    gdp_col = "NY.GDP.PCAP.KD"
     cluster_summary = []
     for cluster in ["Advanced", "Emerging", "Developing"]:
         members_iso = cluster_df[cluster_df["cluster_label"] == cluster]["iso2"].tolist()
@@ -948,9 +933,8 @@ def render_benchmarks_tab(dev_df: pd.DataFrame, cluster_df: pd.DataFrame):
         plot_bgcolor=ELEVATED,
         font=dict(color=TEXT, family="DM Sans"),
         coloraxis_colorbar=dict(
-            title="Score",
+            title=dict(text="Score", font=dict(color=MUTED)),
             tickfont=dict(color=MUTED),
-            titlefont=dict(color=MUTED),
         ),
         margin=dict(l=120, r=20, t=60, b=100),
         xaxis=dict(tickangle=-35, tickfont=dict(color=TEXT, size=10)),
@@ -1042,6 +1026,30 @@ def render_benchmarks_tab(dev_df: pd.DataFrame, cluster_df: pd.DataFrame):
     st.plotly_chart(fig_radar, use_container_width=True)
 
 
+@st.cache_data
+def _build_excel(dev_df: pd.DataFrame, cluster_df: pd.DataFrame) -> bytes:
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        dev_df.to_excel(writer, sheet_name="Historical", index=False)
+        cluster_df.to_excel(writer, sheet_name="Clusters", index=False)
+        for ind_code, ind_label in INDICATORS.items():
+            if ind_code in SPARSE_INDICATORS:
+                continue
+            safe_ind = ind_code.replace(".", "_")
+            frames = []
+            for iso2, economy in COUNTRIES.items():
+                path = os.path.join(PROCESSED_DIR, f"forecast_{safe_ind}_{iso2}.parquet")
+                if os.path.exists(path):
+                    df = pd.read_parquet(path)
+                    df.insert(0, "country", economy)
+                    df.insert(0, "iso2", iso2)
+                    frames.append(df)
+            if frames:
+                combined = pd.concat(frames, ignore_index=True)
+                combined.to_excel(writer, sheet_name=ind_label[:28].strip(), index=False)
+    return output.getvalue()
+
+
 # ── Tab 4: Export ─────────────────────────────────────────────────────────────
 
 def render_export_tab(dev_df: pd.DataFrame, cluster_df: pd.DataFrame):
@@ -1051,39 +1059,7 @@ def render_export_tab(dev_df: pd.DataFrame, cluster_df: pd.DataFrame):
         unsafe_allow_html=False,
     )
 
-    @st.cache_data
-    def build_excel() -> bytes:
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            # Sheet 1: Historical
-            dev_df.to_excel(writer, sheet_name="Historical", index=False)
-
-            # Sheet 2: Clusters
-            cluster_df.to_excel(writer, sheet_name="Clusters", index=False)
-
-            # Sheet 3+: Forecasts per indicator
-            for ind_code, ind_label in INDICATORS.items():
-                if ind_code in SPARSE_INDICATORS:
-                    continue
-                safe_ind = ind_code.replace(".", "_")
-                frames = []
-                for iso2, economy in COUNTRIES.items():
-                    path = os.path.join(
-                        PROCESSED_DIR, f"forecast_{safe_ind}_{iso2}.parquet"
-                    )
-                    if os.path.exists(path):
-                        df = pd.read_parquet(path)
-                        df.insert(0, "country", economy)
-                        df.insert(0, "iso2", iso2)
-                        frames.append(df)
-                if frames:
-                    combined = pd.concat(frames, ignore_index=True)
-                    sheet_name = ind_label[:28].strip()
-                    combined.to_excel(writer, sheet_name=sheet_name, index=False)
-
-        return output.getvalue()
-
-    excel_data = build_excel()
+    excel_data = _build_excel(dev_df, cluster_df)
 
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -1148,7 +1124,7 @@ def main():
                 Africa Development Trajectory <span>Forecaster</span>
             </div>
             <div class="dashboard-subtitle">
-                Where will Kenya be in 2035? Powered by World Bank data · Prophet forecasting · K-Means clustering
+                Where will Kenya be in 2033? Powered by World Bank data · Prophet forecasting · K-Means clustering
             </div>
         </div>
         """,

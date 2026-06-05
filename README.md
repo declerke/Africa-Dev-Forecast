@@ -11,7 +11,7 @@
 | Forecast horizon | 10 years (to 2033) |
 | K-Means clusters | 3 (Advanced / Emerging / Developing) |
 | Dashboard tabs | 4 |
-| Lines of code | 1,232 (app.py) |
+| Lines of code | 1,208 (app.py) |
 | Data cost | $0 (World Bank REST API) |
 | Dashboard cost | $0 (Streamlit Community Cloud) |
 
@@ -51,7 +51,7 @@ data/processed/
 
 app.py (Streamlit)
   ├── Tab 1: 10-Year Trajectory   — Prophet chart + KPI cards + EAC summary
-  ├── Tab 2: Country Clusters     — Bubble scatter + radar chart + membership table
+  ├── Tab 2: Country Clusters     — Bubble scatter + cluster membership table
   ├── Tab 3: Development Benchmarks — Normalised heatmap + Kenya radar
   └── Tab 4: Export               — Excel workbook (Historical + Clusters + Forecasts)
 ```
@@ -161,7 +161,7 @@ The EAC-5 (Kenya, Uganda, Tanzania, Ethiopia, Rwanda) are the primary countries 
 
 ```
 africa-dev-forecast/
-├── app.py                          # Streamlit dashboard — 1,232 lines
+├── app.py                          # Streamlit dashboard — 1,208 lines
 ├── data_pipeline.py                # World Bank fetch + Prophet + K-Means pipeline
 ├── requirements.txt                # Pinned dependencies
 └── data/
